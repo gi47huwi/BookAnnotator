@@ -28,6 +28,11 @@ STATIC = Path(__file__).resolve().parent / "static"
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # a long novel is ~2 MB
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
+
+def ui_version() -> str:
+    """Changes whenever a UI file changes, so open pages can ask for a reload."""
+    return str(int(max(p.stat().st_mtime for p in STATIC.iterdir())))
+
 app = FastAPI(title="Book Annotator", docs_url=None, redoc_url=None, openapi_url=None)
 
 
@@ -60,6 +65,8 @@ async def local_only(request, call_next):
         if origin and origin.rstrip("/") != f"{request.url.scheme}://{request.headers.get('host', '')}":
             return PlainTextResponse("Forbidden: foreign origin.", status_code=403)
     response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers["X-UI-Version"] = ui_version()
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
@@ -101,20 +108,26 @@ def start_processing(book_id: str) -> None:
     threading.Thread(target=run_pipeline, args=(book_id,), daemon=True).start()
 
 
-def run_annotator(book_id: str, lid: str, aid: str, options: dict) -> None:
+def run_annotator(book_id: str, targets: dict, aid: str, options: dict) -> None:
+    """targets: {output_key: layer_id}; single-output annotators use key None."""
     def progress(frac: float, msg: str) -> None:
-        store.update_layer_meta(book_id, lid, progress=round(frac, 3), message=msg)
+        for lid in targets.values():
+            store.update_layer_meta(book_id, lid, progress=round(frac, 3), message=msg)
 
     with _queue_lock:
         try:
             b = store.book(book_id)
-            content, labels = annotators.RUNNERS[aid](b, options, progress)
-            with store.lock():
-                b.save_content(lid, content)
-            store.update_layer_meta(book_id, lid, status="ready", progress=1.0, message="", labels=labels)
+            result = annotators.RUNNERS[aid](b, options, progress)
+            results = result if isinstance(result, dict) else {None: result}
+            for key, lid in targets.items():
+                content, labels = results[key]
+                with store.lock():
+                    b.save_content(lid, content)
+                store.update_layer_meta(book_id, lid, status="ready", progress=1.0, message="", labels=labels)
         except Exception as e:
             traceback.print_exc()
-            store.update_layer_meta(book_id, lid, status="error", message=str(e))
+            for lid in targets.values():
+                store.update_layer_meta(book_id, lid, status="error", message=str(e))
 
 
 @app.on_event("startup")
@@ -398,6 +411,27 @@ class AddLayerIn(BaseModel):
     options: dict = {}
 
 
+def _choose_outputs(outputs: list[dict], wanted) -> list[dict]:
+    """Accept a list of keys, or free text like "quotes, CLiC suspensions"
+    (keys or display names, any case). Not given -> the default selection;
+    an explicitly empty list (all boxes unticked) -> error."""
+    if isinstance(wanted, list) and not wanted:
+        raise HTTPException(400, "tick at least one layer to create")
+    defaults = [o for o in outputs if o.get("default", True)]
+    if not wanted:
+        return defaults
+    items = wanted if isinstance(wanted, list) else re.split(r"[,;\n]+", str(wanted))
+    items = [str(x).strip().lower() for x in items if str(x).strip()]
+    if not items:
+        return defaults
+    chosen = [o for o in outputs
+              if any(x in (o["key"], o["name"].lower(), o["name"].lower().replace("clic ", "")) for x in items)]
+    if not chosen:
+        valid = ", ".join(f"{o['key']} ({o['name']})" for o in outputs)
+        raise HTTPException(400, f"unknown layer choice “{', '.join(items)}” – choose from: {valid}")
+    return chosen
+
+
 @app.post("/api/books/{book_id}/layers")
 def api_add_layer(book_id: str, body: AddLayerIn):
     _book(book_id)
@@ -407,20 +441,34 @@ def api_add_layer(book_id: str, body: AddLayerIn):
     ok, msg = annotators.available(body.annotator)
     if not ok:
         raise HTTPException(400, f"{spec['name']} is not installed ({msg}). Install with: {spec['install']}")
-    name = (body.options.get("name") or spec["name"]).strip()
-    lid = store.unique_layer_id(book_id, body.annotator if body.annotator == "usas" else name)
     level = "manual" if spec["source"] == "manual" else body.options.get("level", "fixed")
     if level not in ("fixed", "suggestion"):
         level = "fixed"
-    layer = {"id": lid, "name": name, "kind": spec["kind"], "source": spec["source"],
-             "annotator": body.annotator, "visible": True, "opacity": 0.8,
-             "level": level, "locked": level == "fixed", "color": spec["color"],
-             "status": "running", "progress": 0.0, "message": "queued", "labels": []}
-    if "style" in spec:
-        layer["style"] = spec["style"]
-    store.add_layer_meta(book_id, layer)
-    threading.Thread(target=run_annotator, args=(book_id, lid, body.annotator, body.options), daemon=True).start()
-    return layer
+
+    def new_layer(lid, name, color, style):
+        layer = {"id": lid, "name": name, "kind": spec["kind"], "source": spec["source"],
+                 "annotator": body.annotator, "visible": True, "opacity": 0.8,
+                 "level": level, "locked": level == "fixed", "color": color,
+                 "status": "running", "progress": 0.0, "message": "queued", "labels": []}
+        if style:
+            layer["style"] = style
+        store.add_layer_meta(book_id, layer)
+        return layer
+
+    if "outputs" in spec:  # one run, several layers
+        outs = _choose_outputs(spec["outputs"], body.options.get("regions"))
+        targets, created = {}, []
+        for o in outs:
+            lid = store.unique_layer_id(book_id, f"{body.annotator}_{o['key']}")
+            created.append(new_layer(lid, o["name"], o["color"], o.get("style")))
+            targets[o["key"]] = lid
+    else:
+        name = (body.options.get("name") or spec["name"]).strip()
+        lid = store.unique_layer_id(book_id, body.annotator if body.annotator == "usas" else name)
+        created = [new_layer(lid, name, spec["color"], spec.get("style"))]
+        targets = {None: lid}
+    threading.Thread(target=run_annotator, args=(book_id, targets, body.annotator, body.options), daemon=True).start()
+    return {"layers": created}
 
 
 @app.delete("/api/books/{book_id}/layers/{lid}")

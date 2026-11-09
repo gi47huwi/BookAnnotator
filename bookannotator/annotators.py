@@ -4,10 +4,12 @@ Each annotator turns the book's existing tokens into a new layer, so its
 output is always aligned with the (possibly edited) tokenisation.
 
 To add one: write a function `run_<id>(book, options, progress) -> (content, labels)`
-and register it in ANNOTATORS.
+and register it in ANNOTATORS. An annotator that yields several layers declares
+them in "outputs" and returns {output_key: (content, labels)}.
 """
 from __future__ import annotations
 
+import bisect
 import importlib.util
 import re
 from collections import Counter
@@ -22,6 +24,28 @@ USAS_INSTALL = ("VIRTUAL_ENV=.venv uv pip install pymusas "
                 "https://github.com/UCREL/pymusas-models/releases/download/"
                 "en_dual_none_contextual-0.3.3/en_dual_none_contextual-0.3.3-py3-none-any.whl")
 
+CLIC_INSTALL = ("brew install icu4c pkgconf && PKG_CONFIG_PATH=$(brew --prefix icu4c)/lib/pkgconfig "
+                "VIRTUAL_ENV=.venv uv pip install clictagger 'setuptools<81'   "
+                "(Linux: apt-get install libicu-dev pkg-config first)")
+
+# CLiC region classes -> output layers (one run, several layers; regions of
+# different classes may overlap, so each class group gets its own layer)
+CLIC_OUTPUTS = [
+    {"key": "quotes", "name": "CLiC quotations", "color": "#1864ab", "style": "underline",
+     "regions": {"quote.quote": "quote"},
+     "description": "direct speech incl. quotation marks"},
+    {"key": "suspensions", "name": "CLiC suspensions", "color": "#e67700", "style": "underline",
+     "regions": {"quote.suspension.short": "short", "quote.suspension.long": "long"},
+     "description": "narrator interruptions inside speech (\u201c…,\u201d said Joe, \u201c…\u201d)"},
+    {"key": "embedded", "name": "CLiC embedded quotations", "color": "#5f3dc4", "style": "underline",
+     "regions": {"quote.embedded": "embedded"},
+     "description": "quotations inside quotations"},
+    {"key": "structure", "name": "CLiC structure", "color": "#495057", "style": "underline",
+     "regions": {"metadata.title": "title", "metadata.author": "author", "chapter.title": "chapter title"},
+     "default": False,
+     "description": "book title, author, chapter headings"},
+]
+
 ANNOTATORS = {
     "usas": {
         "name": "PyMUSAS semantic tags",
@@ -30,6 +54,18 @@ ANNOTATORS = {
         "kind": "token-attr", "source": "auto", "color": "#0c8599",
         "requires": ["pymusas", USAS_MODEL], "install": USAS_INSTALL,
         "options": [],
+    },
+    "clic": {
+        "name": "CLiC tagger",
+        "description": "Quotations, suspensions (narrator interruptions in speech), embedded quotations and "
+                       "chapter structure from the CLiC tagger (Mahlberg lab, mahlberg-lab.github.io/clictagger). "
+                       "Works best on cleaned texts: title and author on lines 1–2, headings like \u201cCHAPTER 1.\u201d.",
+        "kind": "token-span", "source": "auto", "color": "#1864ab", "style": "underline",
+        "requires": ["clictagger", "icu", "pkg_resources"], "install": CLIC_INSTALL,
+        "outputs": CLIC_OUTPUTS,
+        "options": [{"id": "regions", "label": "Layers to create", "type": "checks",
+                     "choices": [{"value": o["key"], "label": o["name"], "hint": o["description"],
+                                  "default": o.get("default", True)} for o in CLIC_OUTPUTS]}],
     },
     "lexicon": {
         "name": "Lexicon matcher",
@@ -57,6 +93,14 @@ ANNOTATORS = {
                     {"id": "labels", "label": "Suggested values (comma-separated)", "type": "text", "default": ""}],
     },
 }
+
+
+def chars_to_tokens(b: Book, cs: int, ce: int) -> tuple[int, int] | None:
+    """Character range [cs, ce) of source.txt -> token range [a, z) covering it."""
+    T = b.doc["tokens"]
+    a = bisect.bisect_right(T["end"], cs)          # first token ending after cs
+    z = bisect.bisect_left(T["start"], ce)         # tokens starting before ce
+    return (a, z) if a < z else None
 
 
 def available(aid: str) -> tuple[bool, str]:
@@ -186,5 +230,34 @@ def run_manual_attr(b: Book, options: dict, progress: Progress):
     return {"values": [""] * b.doc["n_tokens"]}, _split_labels(options.get("labels", ""))
 
 
-RUNNERS = {"usas": run_usas, "lexicon": run_lexicon,
+# ------------------------------------------------------------------ CLiC tagger
+
+def run_clic(b: Book, options: dict, progress: Progress):
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # clictagger imports the deprecated pkg_resources
+        from clictagger.taggedtext import TaggedText
+
+    progress(0.1, "running CLiC tagger")
+    tt = TaggedText(b.text)  # offsets are character positions in source.txt, like our tokens
+    progress(0.8, "mapping regions to tokens")
+    out = {}
+    for o in CLIC_OUTPUTS:
+        spans = []
+        for rclass, label in o["regions"].items():
+            for r in tt.regions.get(rclass, []):
+                ab = chars_to_tokens(b, r[0], r[1])
+                if ab:
+                    spans.append([ab[0], ab[1], label])
+        spans.sort()
+        clean, last_end = [], -1  # a span layer holds non-overlapping spans
+        for sp in spans:
+            if sp[0] >= last_end:
+                clean.append(sp)
+                last_end = sp[1]
+        out[o["key"]] = ({"spans": clean}, list(o["regions"].values()))
+    return out
+
+
+RUNNERS = {"clic": run_clic, "usas": run_usas, "lexicon": run_lexicon,
            "manual-span": run_manual_span, "manual-attr": run_manual_attr}

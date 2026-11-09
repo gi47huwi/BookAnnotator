@@ -38,6 +38,13 @@ usas = [
   "en_dual_none_contextual @ https://github.com/UCREL/pymusas-models/releases/download/en_dual_none_contextual-0.3.3/en_dual_none_contextual-0.3.3-py3-none-any.whl",
 ]
 
+# CLiC tagger layers (quotations, suspensions, embedded quotations, chapters);
+# needs the ICU library: macOS `brew install icu4c pkgconf`, Linux `apt-get install libicu-dev pkg-config`
+clic = [
+  "clictagger>=0.9",
+  "setuptools<81",  # clictagger 0.9 imports pkg_resources
+]
+
 [project.scripts]
 bookannotator = "bookannotator.cli:main"
 

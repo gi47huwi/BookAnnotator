@@ -42,6 +42,7 @@ async function api(path, opts = {}) {
     init.headers = { "Content-Type": "application/json" };
   }
   const r = await fetch(path, init);
+  checkUiVersion(r.headers.get("X-UI-Version"));
   if (!r.ok) {
     let msg = r.statusText;
     try { msg = (await r.json()).detail || msg; } catch {}
@@ -49,6 +50,21 @@ async function api(path, opts = {}) {
     throw new Error(msg);
   }
   return r.json();
+}
+
+/** The server reports the version of the UI files; if they changed while this
+ *  page was open, ask for a reload instead of running outdated code. */
+let uiVersion = null;
+function checkUiVersion(v) {
+  if (!v) return;
+  if (uiVersion === null) { uiVersion = v; return; }
+  if (v !== uiVersion && !document.querySelector("#update-banner")) {
+    const b = document.createElement("div");
+    b.id = "update-banner";
+    b.innerHTML = `Book Annotator was updated. <button class="btn small-btn inline">Reload page</button>`;
+    b.querySelector("button").onclick = () => location.reload();
+    document.body.appendChild(b);
+  }
 }
 
 function toast(msg, ms = 1800) {
@@ -398,7 +414,8 @@ function sentenceHtml(s, prevKey, plan) {
       if (!x) return;
       const sug = isSuggestion(l, s);
       shadows.push(`0 ${2 + n * 3}px 0 0 color-mix(in srgb, ${l.color} calc(var(--op-${l.id}) * ${sug ? 40 : 100}%), transparent)`);
-      if (x[3]) ulLabels += `<span class="ul-l${sug ? " sug" : ""}" style="color:${l.color}">${esc(x[1])}</span>`;
+      // the label only adds information when the layer has more than one
+      if (x[3] && (l.labels || []).length !== 1) ulLabels += `<span class="ul-l${sug ? " sug" : ""}" style="color:${l.color}">${esc(x[1])}</span>`;
     });
     const cont = next && t.ws && plan.underline.some((l) => t.s[l.id] && next.s[l.id] && t.s[l.id][0] === next.s[l.id][0]);
     const textLayers = plan.text.filter((l) => t.s[l.id]);
@@ -716,7 +733,11 @@ $("#add-layer-btn").addEventListener("click", async () => {
       ${a.available ? "" : `<div class="an-missing">Not installed (${esc(a.missing)}). Run:<code>${esc(a.install)}</code></div>`}
       ${a.available ? `<form class="an-form">${a.options.map((o) => o.type === "textarea"
         ? `<label>${esc(o.label)}${o.file ? ` <input type="file" accept=".txt,.tsv,.csv" data-fill="${o.id}">` : ""}</label><textarea name="${o.id}" rows="5" placeholder="river\nflood*\tWATER_MOVEMENT"></textarea>`
-        : `<label>${esc(o.label)}<input name="${o.id}" value="${esc(o.default || "")}"></label>`).join("")}
+        : o.type === "checks"
+          ? `<fieldset class="checks"><legend>${esc(o.label)}</legend>${o.choices.map((c) => `
+              <label class="check"><input type="checkbox" name="${o.id}" value="${esc(c.value)}" ${c.default ? "checked" : ""}>
+                <span>${esc(c.label)}<small>${esc(c.hint || "")}</small></span></label>`).join("")}</fieldset>`
+          : `<label>${esc(o.label)}<input name="${o.id}" value="${esc(o.default || "")}"></label>`).join("")}
         ${a.source === "auto" ? levelSelect : ""}
         <button class="btn primary small-btn">${a.source === "auto" ? "Run" : "Create"}</button></form>` : ""}
     </div>`).join("");
@@ -728,12 +749,18 @@ $("#add-layer-btn").addEventListener("click", async () => {
     form.onsubmit = async (e) => {
       e.preventDefault();
       const aid = form.closest(".annot").dataset.aid;
-      const options = Object.fromEntries([...new FormData(form)].filter(([, v]) => typeof v === "string"));
-      const l = await api(`/api/books/${bid()}/layers`, { method: "POST", json: { annotator: aid, options } });
-      S.book.layers.splice(1, 0, l);
+      const fd = new FormData(form);
+      const options = Object.fromEntries([...fd].filter(([, v]) => typeof v === "string"));
+      for (const box of form.querySelectorAll("fieldset.checks")) {  // multi-value options
+        const name = box.querySelector("input")?.name;
+        if (name) options[name] = fd.getAll(name);
+      }
+      const r = await api(`/api/books/${bid()}/layers`, { method: "POST", json: { annotator: aid, options } });
+      const added = r.layers || [r];
+      S.book.layers.splice(1, 0, ...added);
       box.hidden = true;
-      activate(l.id);
-      if (l.status === "running") pollLayers();
+      activate(added[0].id);
+      if (added.some((l) => l.status === "running")) pollLayers();
     };
   }
 });

@@ -35,6 +35,14 @@ python3.12 -m venv ~/.bookannotator
 ~/.bookannotator/bin/bookannotator serve
 ```
 
+With the optional CLiC tagger layers (needs the ICU library first: macOS
+`brew install icu4c pkgconf`, Linux `apt-get install libicu-dev pkg-config`):
+
+```bash
+PKG_CONFIG_PATH="$(brew --prefix icu4c)/lib/pkgconfig" \
+  uv tool install --python 3.12 "bookannotator[usas,clic] @ git+https://github.com/gi47huwi/BookAnnotator"
+```
+
 Installation downloads the spaCy English model (and the PyMUSAS model) once.
 After that the tool works offline.
 
@@ -74,6 +82,7 @@ panel on the left and the keyboard switch to that layer's tools.
 | Named entities | spaCy | label palette, add / remove / relabel spans |
 | Quotations | rule-based | mark / unmark direct speech |
 | PyMUSAS semantic tags | optional | USAS tags incl. multi-word expressions, alternatives |
+| CLiC tagger | optional | quotations, suspensions (*"…," said Joe, "…"*), embedded quotations, chapter structure from the [CLiC tagger](https://mahlberg-lab.github.io/clictagger/); one run creates the layers you tick |
 | Lexicon matcher | optional | marks terms from your word list (`term<TAB>category`, `river*`) |
 | Manual span / tag layer | optional | your own categories |
 
@@ -154,4 +163,6 @@ In a source checkout, data is stored in `./data/books/` (ignored by git).
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). spaCy models and PyMUSAS have their own licences.
+MIT, see [LICENSE](LICENSE). spaCy models, PyMUSAS and the CLiC tagger have their
+own licences; if you use the CLiC layers, please also cite the CLiC tagger
+(Mahlberg, Wiegand, Lentin & Hennessey).

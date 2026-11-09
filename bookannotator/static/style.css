@@ -317,3 +317,12 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--sel) 40%, transparent)
 .btnpair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .btnpair-label { font-size: 11px; color: var(--muted); }
 .btnpair.browse { grid-template-columns: auto 1fr; }
+
+.an-form fieldset.checks { border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; margin: 0; display: grid; gap: 4px; }
+.an-form fieldset.checks legend { color: var(--muted); padding: 0 4px; }
+.an-form label.check { display: flex; gap: 7px; align-items: flex-start; color: var(--ink); cursor: pointer; }
+.an-form label.check input { margin-top: 3px; }
+.an-form label.check small { display: block; color: var(--muted); font-size: 10.5px; }
+
+#update-banner { position: fixed; top: 56px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; gap: 10px; align-items: center;
+  background: var(--ink); color: var(--paper); padding: 8px 10px 8px 14px; border-radius: 9px; font-size: 13px; box-shadow: 0 6px 24px rgb(0 0 0 / .2); }
