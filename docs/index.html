@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Book Annotator</title>
+  <meta name="description" content="A local, layered annotation tool for literary texts: speakers, sentences, part of speech, entities and semantic tags. Your texts never leave your computer.">
+  <style>
+    :root {
+      --bg: #f4f1ea; --paper: #fffdf8; --ink: #23211d; --muted: #6f695e; --line: #e2ddd1;
+      --accent: #b5501c; --accent-ink: #fff; --code: #efebe1;
+      --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #1b1a18; --paper: #23221f; --ink: #ebe7de; --muted: #a49d8f; --line: #3a3732;
+        --accent: #e07a43; --accent-ink: #1b1a18; --code: #2c2a26;
+      }
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 var(--sans); }
+    a { color: var(--accent); }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+    nav { display: flex; align-items: center; gap: 20px; padding: 18px 0; font-size: 15px; }
+    nav .brand { font: 600 19px var(--serif); color: var(--ink); text-decoration: none; margin-right: auto; }
+    nav a { color: var(--muted); text-decoration: none; }
+    nav a:hover { color: var(--ink); }
+    header.hero { padding: 48px 0 32px; display: grid; gap: 22px; }
+    h1 { font: 600 clamp(36px, 6vw, 58px)/1.05 var(--serif); margin: 0; letter-spacing: -.01em; }
+    .lede { font-size: 20px; color: var(--muted); max-width: 680px; margin: 0; }
+    .promise { display: inline-flex; align-items: center; gap: 10px; background: var(--paper); border: 1px solid var(--line);
+      border-radius: 999px; padding: 6px 14px 6px 8px; font-size: 15px; width: fit-content; }
+    .promise b { background: #2f9e44; color: #fff; border-radius: 999px; padding: 2px 9px; font-size: 12px; letter-spacing: .04em; }
+    .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+    .btn { display: inline-block; padding: 10px 18px; border-radius: 9px; font-weight: 600; text-decoration: none; border: 1px solid var(--line);
+      background: var(--paper); color: var(--ink); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+    figure { margin: 0; }
+    .shot { border-radius: 10px; border: 1px solid var(--line); overflow: hidden; background: var(--paper);
+      box-shadow: 0 18px 50px -24px rgb(0 0 0 / .35); }
+    .shot img { display: block; width: 100%; height: auto; }
+    figcaption { font-size: 14px; color: var(--muted); margin-top: 10px; }
+    section { padding: 56px 0; border-top: 1px solid var(--line); }
+    h2 { font: 600 32px/1.15 var(--serif); margin: 0 0 8px; }
+    .sub { color: var(--muted); margin: 0 0 28px; max-width: 680px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .card { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+    .card h3 { margin: 0 0 6px; font: 600 19px var(--serif); }
+    .card p { margin: 0; color: var(--muted); font-size: 15.5px; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+    .levels { display: grid; gap: 10px; }
+    .level { display: grid; grid-template-columns: 120px 1fr; gap: 14px; align-items: baseline; background: var(--paper);
+      border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+    .tag { font: 700 12px var(--sans); text-transform: uppercase; letter-spacing: .06em; padding: 3px 9px; border-radius: 999px; width: fit-content; }
+    .tag.fixed { background: color-mix(in srgb, var(--muted) 22%, transparent); color: var(--muted); }
+    .tag.suggestion { background: color-mix(in srgb, #f08c00 22%, transparent); color: #b56500; }
+    .tag.manual { background: color-mix(in srgb, #2f9e44 20%, transparent); color: #2b8a3e; }
+    ul.checks { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+    ul.checks li { padding-left: 30px; position: relative; }
+    ul.checks li::before { content: "✓"; position: absolute; left: 0; top: 0; width: 20px; height: 20px; border-radius: 50%;
+      background: #2f9e44; color: #fff; font-size: 12px; display: grid; place-items: center; margin-top: 3px; }
+    ol.steps { padding-left: 22px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; margin: 0; }
+    .two > *, .grid > *, ol.steps > li { min-width: 0; }
+    pre { background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto;
+      font: 14px/1.5 var(--mono); margin: 8px 0 0; }
+    code { font-family: var(--mono); font-size: .9em; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+    pre code { background: none; padding: 0; }
+    kbd { font: 13px var(--mono); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--paper); }
+    table { width: 100%; border-collapse: collapse; font-size: 15px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+    tr:last-child td { border-bottom: 0; }
+    footer { padding: 36px 0 60px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
+    @media (max-width: 760px) {
+      .two { grid-template-columns: 1fr; }
+      .level { grid-template-columns: 1fr; gap: 6px; }
+      nav a.hide-sm { display: none; }
+      section { padding: 40px 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <nav>
+      <a class="brand" href="#">Book Annotator</a>
+      <a class="hide-sm" href="#features">Features</a>
+      <a class="hide-sm" href="#privacy">Privacy</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/gi47huwi/BookAnnotator">GitHub</a>
+    </nav>
+
+    <header class="hero">
+      <span class="promise"><b>LOCAL</b> Your texts never leave your computer</span>
+      <h1>Annotate novels in layers.</h1>
+      <p class="lede">Book Annotator turns a plain-text book into an annotated corpus. Who speaks each sentence, sentence boundaries, part of speech,
+        named entities, semantic fields: each in its own layer, automatic where possible, reviewed by you where it matters.</p>
+      <div class="cta">
+        <a class="btn primary" href="#install">Install</a>
+        <a class="btn" href="https://github.com/gi47huwi/BookAnnotator">Source code</a>
+      </div>
+      <figure>
+        <div class="shot"><img src="img/review-quotations.jpg" width="800" height="500" alt="Book Annotator showing a page of Great Expectations with speaker labels, quotation spans to review and the layers panel"></div>
+        <figcaption>Reviewing automatically detected quotations in <i>Great Expectations</i>: speakers on the left of each sentence, layers on the right.</figcaption>
+      </figure>
+    </header>
+
+    <section id="features">
+      <h2>What you can do</h2>
+      <p class="sub">Load a <code>.txt</code> file. spaCy segments and tags it in about 20 seconds per novel; you take it from there.</p>
+      <div class="grid">
+        <div class="card"><h3>Speaker annotation</h3><p>Mark who speaks each sentence: characters, narrator or both. Suggestions come from quotation marks and attributions like "… said Joe"; keys <kbd>0</kbd>–<kbd>9</kbd> assign speakers.</p></div>
+        <div class="card"><h3>Layers like an image editor</h3><p>Every annotation type is a layer you can show, hide, fade, lock and reorder. Tags appear under the words, spans as highlights or underlines.</p></div>
+        <div class="card"><h3>Three levels of trust</h3><p>Use automatic output as is, review it sentence by sentence, or annotate from scratch, decided per layer. Progress is tracked and exported.</p></div>
+        <div class="card"><h3>Fix sentence boundaries</h3><p>Split, merge and move boundaries with one click. A checker lists suspicious sentences, such as lowercase starts and missing punctuation.</p></div>
+        <div class="card"><h3>Semantic tags &amp; word lists</h3><p>Add PyMUSAS (USAS semantic fields, incl. multi-word expressions), match your own lexicon, or create empty layers for your own categories.</p></div>
+        <div class="card"><h3>Keyboard-first</h3><p><kbd>Tab</kbd> jumps to the next annotation of the active layer, <kbd>Enter</kbd> confirms, <kbd>u</kbd> finds the next open sentence, <kbd>⌘Z</kbd> undoes anything.</p></div>
+        <div class="card"><h3>Corpus export</h3><p>CoNLL-style TSV per book (one column per layer, BIO spans, speakers, review status) and JSONL for the whole corpus.</p></div>
+        <div class="card"><h3>Extensible</h3><p>Plain Python and JavaScript, no build step. New automatic layers are a single function in <code>annotators.py</code>.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="two">
+        <div>
+          <h2>Automatic, but accountable</h2>
+          <p class="sub">Each layer says how far its content can be trusted, and that status travels with your export.</p>
+          <div class="levels">
+            <div class="level"><span class="tag fixed">Fixed</span><span>Automatic output taken as is. Locked; unlock to correct errors.</span></div>
+            <div class="level"><span class="tag suggestion">Suggestion</span><span>Shown dashed until you check a sentence and confirm it with <kbd>Enter</kbd>.</span></div>
+            <div class="level"><span class="tag manual">Manual</span><span>Annotated from scratch; mark each sentence done.</span></div>
+          </div>
+        </div>
+        <figure>
+          <div class="shot"><img src="img/layers-pos.jpg" width="800" height="500" alt="Part-of-speech tags shown under each word, with the UPOS tagset panel" loading="lazy"></div>
+          <figcaption>Part-of-speech layer with interlinear tags and the tagset panel.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section>
+      <div class="two">
+        <figure>
+          <div class="shot"><img src="img/sentence-boundaries.jpg" width="800" height="500" alt="Sentence boundary tools with a list of suspicious sentences" loading="lazy"></div>
+          <figcaption>Sentence boundaries: a mis-split "he said to himself." is flagged and merged with one click.</figcaption>
+        </figure>
+        <div>
+          <h2>Tools follow the layer</h2>
+          <p class="sub">Select a layer and the tool panel and shortcuts change with it.</p>
+          <table>
+            <tr><th>Layer</th><th>Tools</th></tr>
+            <tr><td>Speech</td><td>character list with aliases, suggestions, "same as previous"</td></tr>
+            <tr><td>Sentences</td><td>split / merge, move boundary, suspicious-sentence list</td></tr>
+            <tr><td>POS, PyMUSAS</td><td>tagset with descriptions, the tagger's alternatives</td></tr>
+            <tr><td>Entities, spans</td><td>label palette, add / relabel / remove, spans on the page</td></tr>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="privacy">
+      <h2>Privacy and security</h2>
+      <p class="sub">Literary corpora are often under copyright and research data deserves care. Book Annotator is built so that you never have to trust a server.</p>
+      <ul class="checks">
+        <li><b>Runs on your computer.</b> There is no server, account or cloud. Texts and annotations are plain files in a folder you choose.</li>
+        <li><b>Offline after installation.</b> spaCy and PyMUSAS run locally. No telemetry, no external fonts, scripts or APIs.</li>
+        <li><b>Not reachable from the network.</b> The app listens on <code>127.0.0.1</code> only and offers no option to change that.</li>
+        <li><b>Protected against browser attacks.</b> Requests from other websites (cross-site requests, DNS rebinding) are refused; a strict Content Security Policy prevents injected scripts.</li>
+        <li><b>Open source.</b> MIT licensed, so you or your institution can audit every line.</li>
+      </ul>
+      <p class="sub" style="margin-top:20px">Details: <a href="https://github.com/gi47huwi/BookAnnotator/blob/main/SECURITY.md">SECURITY.md</a>.</p>
+    </section>
+
+    <section id="install">
+      <h2>Install</h2>
+      <p class="sub">You need Python 3.10–3.12. The simplest route uses <a href="https://docs.astral.sh/uv/">uv</a>.</p>
+      <ol class="steps">
+        <li>Install Book Annotator (with the optional PyMUSAS layer):
+          <pre><code>uv tool install --python 3.12 "bookannotator[usas] @ git+https://github.com/gi47huwi/BookAnnotator"</code></pre></li>
+        <li>Start it. Your browser opens the app:
+          <pre><code>bookannotator serve</code></pre></li>
+        <li>Upload a <code>.txt</code> file (UTF-8, paragraphs separated by blank lines, e.g. from Project Gutenberg) and start annotating.
+          Your data is stored in <code>~/BookAnnotator/books/</code>; back it up.</li>
+      </ol>
+      <p class="sub" style="margin-top:22px">Without uv, or for development, see the <a href="https://github.com/gi47huwi/BookAnnotator#install">README</a>.</p>
+    </section>
+
+    <section id="cite">
+      <h2>Cite</h2>
+      <p class="sub">If Book Annotator helps your research, please cite it. Citation data is in
+        <a href="https://github.com/gi47huwi/BookAnnotator/blob/main/CITATION.cff">CITATION.cff</a>; GitHub's "Cite this repository" button gives BibTeX and APA.</p>
+    </section>
+  </div>
+  <footer>
+    <div class="wrap">Book Annotator · MIT licence · Screenshots show Charles Dickens, <i>Great Expectations</i> (public domain).</div>
+  </footer>
+</body>
+</html>

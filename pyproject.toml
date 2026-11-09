@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bookannotator"
+version = "0.1.0"
+description = "Local, layered annotation tool for literary texts: speakers, sentences, POS, entities, semantic tags."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Andreas C. Wagner", email = "andreas.w.wagner@fau.de" }]
+requires-python = ">=3.10,<3.13"
+keywords = ["annotation", "digital humanities", "corpus linguistics", "literature", "spaCy", "speech attribution"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Intended Audience :: Science/Research",
+  "Topic :: Text Processing :: Linguistic",
+  "Environment :: Web Environment",
+]
+dependencies = [
+  "spacy>=3.8,<3.9",
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "python-multipart>=0.0.9",
+  "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+]
+
+[project.urls]
+Homepage = "https://gi47huwi.github.io/BookAnnotator/"
+Source = "https://github.com/gi47huwi/BookAnnotator"
+Issues = "https://github.com/gi47huwi/BookAnnotator/issues"
+
+[project.optional-dependencies]
+# PyMUSAS semantic tagging layer
+usas = [
+  "pymusas>=0.3",
+  "en_dual_none_contextual @ https://github.com/UCREL/pymusas-models/releases/download/en_dual_none_contextual-0.3.3/en_dual_none_contextual-0.3.3-py3-none-any.whl",
+]
+
+[project.scripts]
+bookannotator = "bookannotator.cli:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["bookannotator"]
+
+[tool.hatch.build.targets.sdist]
+include = ["bookannotator", "README.md", "LICENSE", "SECURITY.md", "CITATION.cff"]

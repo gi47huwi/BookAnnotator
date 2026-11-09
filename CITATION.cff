@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use Book Annotator in your research, please cite it as below."
+title: "Book Annotator: a local, layered annotation tool for literary texts"
+type: software
+version: 0.1.0
+date-released: 2026-11-09
+license: MIT
+repository-code: "https://github.com/gi47huwi/BookAnnotator"
+url: "https://gi47huwi.github.io/BookAnnotator/"
+keywords:
+  - annotation
+  - digital humanities
+  - speech attribution
+  - corpus linguistics
+authors:
+  - family-names: "Wagner"
+    given-names: "Andreas C."
+    affiliation: "Friedrich-Alexander-Universität Erlangen-Nürnberg (FAU)"
+    orcid: "https://orcid.org/0009-0005-5756-7694"
+    email: "andreas.w.wagner@fau.de"

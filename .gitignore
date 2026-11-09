@@ -1,0 +1,15 @@
+# environments
+/.venv/
+/.venv-*/
+__pycache__/
+*.egg-info/
+/dist/
+/build/
+
+# your books and annotations – never commit them
+/data/
+*.tmp
+
+# local tool settings
+/.claude/
+.DS_Store

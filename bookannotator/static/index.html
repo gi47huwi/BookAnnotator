@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Book Annotator</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/">Book Annotator</a>
+    <div id="crumbs" class="crumbs"></div>
+    <div id="topbar-right" class="topbar-right"></div>
+  </header>
+
+  <!-- library -->
+  <main id="library" class="library" hidden>
+    <section class="lib-head">
+      <div>
+        <h1>Corpus</h1>
+        <p class="muted">Upload plain-text books. Each is segmented into sentences and tagged with spaCy (POS, entities, quotations) before you annotate.</p>
+      </div>
+      <a class="btn" href="/api/export/corpus.jsonl">Export corpus (JSONL)</a>
+    </section>
+
+    <form id="upload" class="upload">
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept=".txt,text/plain" hidden>
+        <span id="drop-label"><strong>Choose a .txt file</strong> or drop it here</span>
+      </label>
+      <input id="up-title" placeholder="Title (optional)">
+      <input id="up-author" placeholder="Author (optional)">
+      <button class="btn primary" type="submit">Upload &amp; process</button>
+    </form>
+
+    <div id="books" class="books"></div>
+  </main>
+
+  <!-- annotation workspace -->
+  <main id="workspace" class="workspace" hidden>
+    <!-- tool panel: content depends on the active layer -->
+    <aside class="panel left" id="tools"></aside>
+
+    <section class="reader-wrap" id="reader-wrap">
+      <article id="reader" class="reader"></article>
+      <nav class="pager" id="pager-bottom"></nav>
+    </section>
+
+    <aside class="panel right">
+      <div class="panel-head"><h2>Layers</h2></div>
+      <ul id="layers" class="layers"></ul>
+      <button id="add-layer-btn" class="btn ghost small-btn add-layer-btn">+ Add layer</button>
+      <div id="add-layer" class="add-layer" hidden></div>
+      <div id="layer-props" class="layer-props"></div>
+
+      <div class="panel-head mt"><h2>Sentence</h2><span id="insp-id" class="muted small"></span></div>
+      <div id="inspector" class="inspector"><p class="muted small">Click a sentence.</p></div>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>
